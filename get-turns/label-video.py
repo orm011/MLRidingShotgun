@@ -16,7 +16,7 @@ with open(in_fname, 'r') as f:
 		p = geom.FPoint(lon, lat)
 		p = coords.lonLatToMeters(p).to_point()
 		p.seqno = seqno
-		if len(points) == 0 or points[-1].distance(p) > 5:
+		if len(points) == 0 or points[-1].distance(p) > 3:
 			points.append(p)
 rect = points[0].bounds()
 for p in points[1:]:
@@ -28,7 +28,8 @@ positions = r.match(points)
 with open(out_fname, 'w') as f:
 	for i in range(len(points)):
 		turn_info = r._get_turn_info(points[i], positions[i:])
-		if turn_info is not None:
+		if turn_info is None:
+			continue
 		f.write('{},{},{}\n'.format(points[i].seqno, turn_info.distance, turn_info.angle))
 
 '''

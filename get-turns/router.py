@@ -1,4 +1,4 @@
-import geom, graph
+import coords, geom, graph
 
 import math
 import numpy
@@ -19,6 +19,17 @@ def densify(points):
 		orig_indices.append(len(npoints))
 		npoints.append(point)
 	return npoints, orig_indices
+
+def haversine_distance(p1, p2):
+	p1 = coords.metersToLonLat(p1)
+	p2 = coords.metersToLonLat(p2)
+	R = 6378.137
+	dlon = p2.x * math.pi / 180 - p1.x * math.pi / 180
+	dlat = p2.y * math.pi / 180 - p1.y * math.pi / 180
+	a = math.sin(dlat / 2) * math.sin(dlat / 2) + math.cos(p1.y * math.pi / 180) * math.cos(p2.y * math.pi / 180) * math.sin(dlon / 2) * math.sin(dlon / 2)
+	c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+	d = R * c
+	return d *1000
 
 class Router(object):
 	def __init__(self, g):
@@ -141,9 +152,11 @@ class Router(object):
 				continue
 
 			if start == npositions[0].edge:
-				distance += start_point.distance(start.dst.point)
+				#distance += start_point.distance(start.dst.point)
+				distance += haversine_distance(start_point, start.dst.point)
 			else:
-				distance += start.segment().length()
+				#distance += start.segment().length()
+				distance += haversine_distance(start.src.point, start.dst.point)
 
 			if len(start.dst.out_edges) == 2:
 				continue
