@@ -20,15 +20,17 @@ BLACKLIST = set([
 	"give_way",
 ])
 
-def read(fname, bb=None):
+def read(fname, bb=None, ll_bb=None):
 	g = graph.Graph()
 	vertex_map = {}
 	def coords_callback(clist):
 		for osmid, lon, lat in clist:
 			p = geom.FPoint(lon, lat)
-			if bb is not None and not bb.contains(p):
+			if ll_bb is not None and not ll_bb.contains(p):
 				continue
 			p = coords.lonLatToMeters(p).to_point()
+			if bb is not None and not bb.contains(p):
+				continue
 			vertex_map[osmid] = g.add_vertex(p)
 	def ways_callback(ways):
 		for osmid, tags, refs in ways:

@@ -4,41 +4,6 @@ import math
 import numpy
 from PIL import Image
 
-'''
-import coords, geom, osm, router
-bb = geom.Rectangle(geom.FPoint(-71.124881, 42.331305), geom.FPoint(-71.037418, 42.375642))
-g = osm.read('massachusetts-latest.osm.pbf', bb)
-r = router.Router(g)
-points = [
-	(42.362000, -71.097892),
-	(42.360898, -71.096165),
-	(42.360375, -71.095253),
-	(42.360954, -71.093193),
-	(42.362080, -71.091616),
-	(42.362484, -71.090265),
-	(42.363245, -71.089771),
-	(42.364133, -71.089557),
-	(42.365290, -71.089342),
-	(42.366154, -71.088784),
-	(42.366320, -71.087443),
-	(42.366138, -71.085952),
-	(42.366138, -71.085952),
-	(42.367231, -71.084161),
-	(42.367952, -71.083957),
-	(42.368206, -71.085030),
-	(42.368293, -71.086511),
-	(42.368341, -71.087756),
-	(42.367842, -71.087874),
-	(42.367113, -71.088089),
-	(42.366709, -71.088164),
-	(42.366368, -71.087788),
-	(42.366320, -71.086683),
-]
-points = map(lambda p: geom.FPoint(p[1], p[0]), points)
-points = map(lambda p: coords.lonLatToMeters(p).to_point(), points)
-positions = r.match(points)
-'''
-
 TOLERANCE = 100
 SIGMA = 30
 DENSITY = 10
@@ -96,6 +61,8 @@ class Router(object):
 		# run viterbi
 		backpointers = [{edge_id: edge_id for edge_id in probs}]
 		for pointIdx, p in enumerate(points[1:]):
+			if pointIdx % 100 == 99:
+				print '{}/{}'.format(pointIdx, len(points))
 			next_probs = {}
 			next_backpointers = {}
 			# find the most likely to match the emission+transition
