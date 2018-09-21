@@ -1,5 +1,5 @@
 import coords, geom, osm, router
-
+import sqlalchemy as sa
 import sys
 
 in_fname = sys.argv[1]
@@ -22,7 +22,9 @@ rect = points[0].bounds()
 for p in points[1:]:
 	rect = rect.extend(p)
 rect = rect.add_tol(512)
-g = osm.read('massachusetts-latest.osm.pbf', bb=rect)
+e = sa.create_engine('postgresql://osm:osm@localhost:5432/osm')
+conn = e.connect()
+g = osm.db_read(conn=conn, bb=rect)
 r = router.Router(g)
 positions = r.match(points)
 with open(out_fname, 'w') as f:

@@ -1,10 +1,13 @@
 import coords, geom, graph
 import sys
-from collections import deque
+from collections import deque, OrderedDict
 
 import pandas as pd
 from imposm.parser import OSMParser
 import numpy as np
+import shapely.geometry as shp_geom
+import sqlalchemy as sa
+import sqlalchemy.sql as sq
 
 BLACKLIST = set([
 	"pedestrian",
@@ -72,6 +75,49 @@ def read(fname, bb=None, ll_bb=None):
 			final_vertices.append(v)
 
 	return final_vertices, edges, out_ways
+
+def to_wkt(bb):
+	shp_box = shp_geom.box(minx=bb.start.x, miny=bb.start.y, maxx=bb.end.x, maxy=bb.end.y)
+	return shp_box.to_wkt()
+
+### test box:
+### around MIT '''POLYGON ((-71.0956621170043945 42.3594794143782494, -71.0941171646118164 42.3594794143782494,
+				# -71.0941171646118164 42.3607002961385035, -71.0956621170043945 42.3607002961385035, -71.0956621170043945 42.3594794143782494))'''
+
+def db_read(conn, bb=None):
+
+	if bb is not None:
+		box_wkt = to_wkt(bb)
+
+	way_ids = sq.text('''select osm_id from import.osm_roads as roads
+						 where ST_Intersects(roads.geometry, ST_Transform(ST_GeomFromText(:box_wkt, 4326), 3857))''')
+
+	node_ids = sq.select([sq.column('vtx_id')]).distinct().select_from('import.graph_way_vertices').where(
+		sq.column('osm_id').in_(way_ids))
+
+	vertices_with_coords = sq.select('*').select_from('import.graph_vertices').where(
+		sq.column('osm_id').in_(node_ids)
+	)
+
+	edges = sq.select('*').select_from('import.graph_edges').where(
+		sq.column('osm_id').in_(way_ids)
+	)
+
+	vtx =  pd.read_sql(vertices_with_coords, con=conn, params=dict(box_wkt=box_wkt))
+	edges = pd.read_sql(edges, con=conn, params=dict(box_wkt=box_wkt))
+
+	g = graph.Graph()
+	vtx_map = OrderedDict({})
+	for tup in vtx.itertuples():
+		pt = coords.lonLatToMeters(geom.FPoint(tup.lon, tup.lat)).to_point()
+		vtx_map[tup.osm_id] = g.add_vertex(pt)
+
+	for tup in edges.itertuples():
+		g.add_bidirectional_edge(vtx_map[tup.src], vtx_map[tup.dst])
+
+	return g
+
+
 
 
 if __name__ == '__main__':
