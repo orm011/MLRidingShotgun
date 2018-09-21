@@ -3,10 +3,8 @@ import sys
 from collections import deque, OrderedDict
 
 import pandas as pd
-from imposm.parser import OSMParser
 import numpy as np
 import shapely.geometry as shp_geom
-import sqlalchemy as sa
 import sqlalchemy.sql as sq
 
 BLACKLIST = set([
@@ -27,7 +25,8 @@ BLACKLIST = set([
 	"give_way",
 ])
 
-def read(fname, bb=None, ll_bb=None):
+def parse(fname, bb=None, ll_bb=None):
+	from imposm.parser import OSMParser
 
 	vertex_set = set([])
 	vertices = deque([]) # (osm_id, lon, lat)
@@ -76,18 +75,22 @@ def read(fname, bb=None, ll_bb=None):
 
 	return final_vertices, edges, out_ways
 
-def to_wkt(bb):
-	shp_box = shp_geom.box(minx=bb.start.x, miny=bb.start.y, maxx=bb.end.x, maxy=bb.end.y)
-	return shp_box.to_wkt()
-
 ### test box:
 ### around MIT '''POLYGON ((-71.0956621170043945 42.3594794143782494, -71.0941171646118164 42.3594794143782494,
 				# -71.0941171646118164 42.3607002961385035, -71.0956621170043945 42.3607002961385035, -71.0956621170043945 42.3594794143782494))'''
 
-def db_read(conn, bb=None):
+import geojson
 
+
+def db_read(conn, bb=None, geojson_box=None):
 	if bb is not None:
-		box_wkt = to_wkt(bb)
+		box_wkt = shp_geom.box(minx=bb.start.x, miny=bb.start.y, maxx=bb.end.x, maxy=bb.end.y).to_wkt()
+	elif geojson_box is not None:
+		gj1 = geojson.loads(geojson_box)
+		box_wkt = shp_geom.shape(gj1).to_wkt()
+	else:
+		box_wkt = shp_geom.box(minx=-170.0, miny=-80.0, maxx=179.0, maxy=80.0).to_wkt()
+
 
 	way_ids = sq.text('''select osm_id from import.osm_roads as roads
 						 where ST_Intersects(roads.geometry, ST_Transform(ST_GeomFromText(:box_wkt, 4326), 3857))''')
@@ -105,28 +108,28 @@ def db_read(conn, bb=None):
 
 	vtx =  pd.read_sql(vertices_with_coords, con=conn, params=dict(box_wkt=box_wkt))
 	edges = pd.read_sql(edges, con=conn, params=dict(box_wkt=box_wkt))
+	return vtx, edges
 
+def to_graph(vtx_df, edges_df):
 	g = graph.Graph()
 	vtx_map = OrderedDict({})
-	for tup in vtx.itertuples():
+	for tup in vtx_df.itertuples():
 		pt = coords.lonLatToMeters(geom.FPoint(tup.lon, tup.lat)).to_point()
 		vtx_map[tup.osm_id] = g.add_vertex(pt)
 
-	for tup in edges.itertuples():
+	for tup in edges_df.itertuples():
 		g.add_bidirectional_edge(vtx_map[tup.src], vtx_map[tup.dst])
 
 	return g
 
 
-
-
 if __name__ == '__main__':
 		import json
-		(v, e, w) = read(sys.argv[1], bb=None, ll_bb=None)
-		# vtx = pd.DataFrame(data=list(v), columns=['osm_id', 'lon', 'lat'])
-		# vtx.to_csv('osm_vertices_ma2.csv', index=False)
-		# edg = pd.DataFrame(data=list(e), columns=['osm_id', 'index', 'src', 'dst'])
-		# edg.to_csv('osm_edges_ma2.csv', index=False)
+		(v, e, w) = parse(sys.argv[1])
+		vtx = pd.DataFrame(data=list(v), columns=['osm_id', 'lon', 'lat'])
+		vtx.to_csv('osm_vertices_ma2.csv', index=False)
+		edg = pd.DataFrame(data=list(e), columns=['osm_id', 'index', 'src', 'dst'])
+		edg.to_csv('osm_edges_ma2.csv', index=False)
 		ways = pd.DataFrame(data=list(w), columns=['osm_id', 'refs'])
 		ways['refs'] = ways.refs.map(json.dumps)
 		ways.to_csv('osm_ways_ma2.csv', index=False)

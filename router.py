@@ -1,4 +1,4 @@
-import coords, geom, graph
+import coords, geom
 
 import math
 import numpy

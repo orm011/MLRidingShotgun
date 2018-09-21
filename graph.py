@@ -1,6 +1,5 @@
 import geom
 
-import math
 import numpy
 import rtree
 
